@@ -1,0 +1,586 @@
+<head>
+<!-- Resources -->
+
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/stock/modules/export-data.js"></script>
+<script type="application/javascript" src="http://cdn.bootcss.com/stomp.js/2.3.3/stomp.min.js"></script>
+
+</head>
+<style>
+#chartdiv {
+  width: 100%;
+  height: 500px;
+}
+::-webkit-scrollbar {
+    width: 0px;  /* remove scrollbar space */
+    background: transparent;  /* optional: just make scrollbar invisible */
+}
+</style>
+
+<body>
+{% include "nav_bar.html" %}
+	<div class="ui grid" style="margin: 3vh 5vw 5vw; min-height: 75vh;">
+		<div class="six column centered row" style="height: 10vh;">
+			<div class="ui steps">
+			  <div class="active step" id = "calendar">
+			    <i class="calendar alternate outline icon"></i>
+			    <div class="content">
+			      <div class="title">Choose date</div>
+			      <div class="description">Decide your trading date</div>
+			    </div>
+			  </div>
+
+			  <div class="step" id = "pairs_found">
+			    <i class="venus double icon"></i>
+			    <div class="content">
+			      <div class="title">Select one pair</div>
+			      <div class="description">Choose pairs to trade</div>
+			    </div>
+			  </div>
+			  <div class="step" id="trade_result">
+			    <i class="dollar sign icon"></i>
+			    <div class="content">
+			      <div class="title">Trading result</div>
+			    </div>
+			  </div>
+			</div>
+		</div>
+
+		<div class="four column centered row" id = "chosse_date" style="height: 10vh;">
+			  <h3>選擇日期</h3>
+			  <div class="ui calendar" id="example2">
+			    <div class="ui input left icon">
+			      <i class="calendar icon"></i>
+			      <input type="text" id="datepicker" autocomplete="off">
+			    </div>
+			  </div>
+		</div>
+		<div class="six column centered row" id = "date_pick" style="height: 45vh; margin-top: 0vh;">
+			<button id="submit1" class="positive ui button">下一步</button>
+		</div>
+		<div class="four column centered row" id = "pairs_table" style="display:none ; height: 65vh; overflow-y: scroll;">
+			  <h3>配對</h3>
+				<table class="ui celled table">
+				  <thead>
+				    <tr><th>stock1</th>
+				    <th>stock2</th>
+				    <th>weight 1</th>
+				    <th>weight 2</th>
+				    <th>trade</th>
+				  </tr></thead>
+				  <tbody id="pair">
+				  </tbody>
+				</table>			  
+		</div>
+		<div class="centered row" id = "pairs_chart" style="display:none ; min-height: 60vh;">
+			<div class="nine wide column" id="trade_result" style="height: 75vh; overflow-y: scroll;">
+
+					<table class="ui orange very basic collapsing celled table" style="display: inline-block;">
+					  <thead>
+					    <tr><th colspan="2">配對資訊</th>
+					  </tr></thead>
+					  <tbody id="pairs_info">
+
+					  </tbody>
+					</table>
+
+					<table class="ui green very basic collapsing celled table" style="display: inline-block; margin-left: 4vw;">
+					  <thead>
+					    <tr><th >交易資訊</th>
+					    	<th><div id="retrade" class="ui yellow button" style="color:black;">重新回測</div></th>
+					  </tr>
+					</thead>
+					  <tbody id="trade_info">
+					  		<tr>	
+					  			<td> 開倉門檻</td>
+					  			<td> <div class="ui mini input"><input id="open" type="text" name="open" value="1.5" style="width: 4vw"></div> 倍標準差</td>
+					  		</tr>
+					  		<tr>	
+					  			<td>停損門檻</td>
+					  			<td><div class="ui mini input"><input id="stop" type="text" name="open" value="2.5" style="width: 4vw"></div> 倍標準差</td>
+					  		</tr>
+					  		<tr>	
+					  			<td>股票最大持有張數</td>
+					  			<td><div class="ui mini input"><input id="max_keep" type="text" name="open" value="5" style="width: 4vw"></div> 張</td>
+					  		</tr>
+					  		<tr>	
+					  			<td>交易成本</td>
+					  			<td><div class="ui mini input"><input id="tax_cost" type="text" name="open" value="0.0" style="width: 4vw"></div> %</td>
+					  		</tr>
+					  		<tr>	
+					  			<td>配對投入資金</td>
+					  			<td><div class="ui mini input"><input id="invest" type="text" name="open" value="300" style="width: 4vw"></div> 萬</td>
+					  		</tr>
+					  </tbody>
+					</table>
+
+					<table class="ui green very basic collapsing celled table" style="display: inline-block; margin-left: 4vw;">
+					  <thead>
+					    <tr><th colspan="2">交易結果</th>
+					  </tr></thead>
+					  <tbody id="trade_result_table">
+					  		<tr><td class="center aligned" colspan="2"> 計算中 .... </td></tr>
+					  </tbody>
+					</table>
+				<table class="ui blue celled striped table" style="max-height: 25vh; overflow-y: scroll;">
+				  <thead>
+				    <tr>  <thead>
+				    <tr><th>公司</th>
+				    <th>來源</th>
+				    <th>新聞</th>
+				  </tr></thead>
+
+				  <tbody id="trade_news">
+				  		<tr>	<td class="center aligned" colspan="2"> 新聞爬取中 .... </td></tr>
+				  </tbody>
+				</table>				
+				<table class="ui blue celled striped table" style="height: 35vh; overflow-y: scroll;">
+				  <thead>
+				    <tr><th colspan="2">交易過程</th>
+				  </tr></thead>
+
+				  <tbody id="trade_history">
+				  		<tr>	<td class="center aligned" colspan="2"> 計算中 .... </td></tr>
+				  </tbody>
+				</table>				
+			</div>
+			<div class="seven wide column">
+			<div id="container1" style="height: 50%; min-width: 100%; "></div>
+			<div id="container2" style="height: 50%; min-width: 100%;  "></div>
+			<div id="container3" style="height: 50%; min-width: 100%; "></div>
+			</div>
+		</div>
+
+		<div class="six column centered row" id = "go_trade" style="display:none ; min-height: 5vh;">
+			<button id="submit3" class="positive ui button" onclick="window.location.reload(true);">重新選擇</button>
+		</div>
+	</div>
+{% include "footer.html" %}
+<link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+<link href="https://cdn.rawgit.com/mdehoog/Semantic-UI/6e6d051d47b598ebab05857545f242caf2b4b48c/dist/semantic.min.css" rel="stylesheet" type="text/css" />
+<script src="https://code.jquery.com/jquery-2.1.4.js"></script>
+<script src="https://cdn.rawgit.com/mdehoog/Semantic-UI/6e6d051d47b598ebab05857545f242caf2b4b48c/dist/semantic.min.js"></script>
+
+<script>
+
+
+$(document).ready(function () {
+
+	$('#example2').calendar({
+	  type: 'date',
+	  maxDate: new Date(),
+	  formatter: {
+	    date: function (date, settings) {
+	      if (!date) return '';
+	      var day = date.getDate();
+	      var month = date.getMonth() + 1;
+	      var year = date.getFullYear();
+	      if (month.toString().length < 2){
+	      	month = "0" + month.toString()
+	      }
+	      if (day.toString().length < 2){
+	      	day = "0" + day.toString()
+	      }
+	      return year + "-" + month + "-" + day;
+	    }
+	  }
+	});
+});
+$('#submit1').click(function(){
+	var day = $('#datepicker').val();
+
+	$.ajax({
+	    	type:"GET",
+	    	dataType: 'json',
+	        url: "/stock/find_past_pairs",
+	        data : { 'trade_date' : day },
+	        success: function(response) {
+	        	data = JSON.parse(response);
+	        	pairs_info = data;
+	        	$( "#chosse_date" ).hide(500);
+	        	$( "#date_pick" ).hide(500);
+	        	$( "#pairs_table" ).show( 500 );
+	        	$( "#calendar" ).removeClass( "active" );
+	        	$( "#pairs_found" ).addClass( "active" );
+				risk = ['#94fa7a;', '#fa7575' , '#ffffff']
+				buy = ["Short", "Long", "Neutral"]
+				text = ""
+				if (data.length==0){
+					text = "<h3 style='padding:5vh;'>無適合交易的股票配對 。</h3>"
+				}
+				for (var i = 0 ; i < data.length; i++){
+					pos1 = Math.floor((Math.random() * 10) + 1)%3
+					pos2 = Math.floor((Math.random() * 10) + 1)%3
+					text += "<tr class='styled accordion'> " + "<td class=' center aligned ' >" +data[i]["stock1"] + "</td>" + "<td class=' center aligned ' >" + data[i]["stock2"] + "</td>";
+
+					console.log(data[i]["w1"])
+					if(data[i]["w1"]<0){
+						text += "<td class=' center aligned ' style='background:#94fa7a;'>"  +String(parseFloat(data[i]["w1"]).toFixed(4)) + "</td>"
+					}
+					else{
+						text += "<td class=' center aligned ' style='background:#fa7575;'>"  +String(parseFloat(data[i]["w1"]).toFixed(4)) + "</td>"						
+					}
+					if(data[i]["w2"]<0){
+						text += "<td class=' center aligned ' style='background:#94fa7a;'>"  +String(parseFloat(data[i]["w2"]).toFixed(4)) + "</td>"
+					}
+					else{
+						text += "<td class=' center aligned ' style='background:#fa7575;'>"  +String(parseFloat(data[i]["w2"]).toFixed(4)) + "</td>"
+					}
+
+					// "<td class=' center aligned' style='background:" + risk[pos1] + ";'>" + buy[pos1]+ "</td><td class=' center aligned' style='background:" + risk[pos2]+ ";' >" + buy[pos2] +
+					text += "</td><td class=' center aligned' ><button class=' center aligned ui button trade' data-s1 = " + data[i]["stock1"] +" data-s2 = " + data[i]["stock2"] +" data-day = " + day + " data-w1 = " + data[i]["w1"] + " data-w2 = " + data[i]["w2"] + " data-snr = "+ data[i]["snr"] + " data-zcr = "+ data[i]["zcr"] + " data-mu = " + data[i]["mu"] + " data-stdev = " + data[i]["stdev"] + " data-e_mu = " + data[i]["e_mu"] + " data-e_stdev = " + data[i]["e_stdev"] + "> trade </button> " + "</td>" + "</tr>";
+
+					// text += "<tr class='styled accordion' style='display:none'> " + "<td class=' center aligned ' >" + '公司' + "</td>" + "<td class=' center aligned ' >" + '新聞標題' + "</td>" + "<td class=' center aligned ' >" + '時間' + "</td>" + "<td class=' center aligned ' >" + '新聞內容' + "</td>" + "<td class=' center aligned ' >" + '漲跌預測' + "</td>";
+				}
+				document.getElementById("pair").innerHTML = text;
+				start_trade();
+	        }
+	 });
+});
+
+
+function start_trade(){
+	$(".trade").click(function() {
+	var w1 = $(this).attr('data-w1');
+	var w2 = $(this).attr('data-w2');
+	var s1 = $(this).attr('data-s1');
+	var s2 = $(this).attr('data-s2');
+	var zcr = $(this).attr('data-zcr');
+	var snr = $(this).attr('data-snr');
+	var mu = $(this).attr('data-mu');
+	var stdev = $(this).attr('data-stdev');
+	var day = $(this).attr('data-day');
+	$.ajax({
+	    	type:"GET",
+	    	dataType: 'json',
+	        url: "/stock/get_pairs_price",
+	        data : { 's1' : "s_" + s1, 's2' : "s_" + s2 , "trade_date" : day, 'w1' : w1, 'w2' : w2 },
+	        success: function(response) {
+	        	data = JSON.parse(response);
+	            var processed_json = new Array();
+	            for (i = 0; i < data["s1"].length; i++) {
+	                processed_json.push([Date.parse(data["s1"][i].mtimestamp), parseFloat(data["s1"][i].avg_price)]);
+	            }
+
+			            // draw chart
+				Highcharts.stockChart('container1', {
+
+				  time: {
+				    useUTC: false
+				  },
+
+				  rangeSelector: {
+				    buttons: [{
+				      count: 1,
+				      type: 'minute',
+				      text: '1M'
+				    }, {
+				      count: 5,
+				      type: 'minute',
+				      text: '5M'
+				    }, {
+				      type: 'all',
+				      text: 'All'
+				    }],
+				    inputEnabled: false,
+				    selected: 2
+				  },
+
+				  title: {
+				    text: data["s1_info"]["s_name"] + " (" + s1 + ") " + " 股價"
+				  },
+
+				  exporting: {
+				    enabled: false
+				  },
+			        navigator: {
+			            enabled: false
+			        },
+			        scrollbar: {
+			            enabled: false
+			        },
+					xAxis: {
+					    type: 'datetime',
+
+					    dateTimeLabelFormats : {
+					        hour: '%I %p',
+					        minute: '%I:%M %p'
+					    }
+					},
+				  series: [{
+				    name: s1,
+				    data: processed_json
+				  }]
+				});
+
+	            var processed_json2 = new Array();
+	            for (i = 0; i < data["s2"].length; i++) {
+	                processed_json2.push([Date.parse(data["s2"][i].mtimestamp), parseFloat(data["s2"][i].avg_price)]);
+	            }
+	            // console.log(processed_json2);
+
+			            // draw chart
+				Highcharts.stockChart('container2', {
+
+				  time: {
+				    useUTC: false
+				  },
+
+				  rangeSelector: {
+				    buttons: [{
+				      count: 1,
+				      type: 'minute',
+				      text: '1M'
+				    }, {
+				      count: 5,
+				      type: 'minute',
+				      text: '5M'
+				    }, {
+				      type: 'all',
+				      text: 'All'
+				    }],
+				    inputEnabled: false,
+				    selected: 2
+				  },
+			        navigator: {
+			            enabled: false
+			        },
+				  title: {
+				    text: data["s2_info"]["s_name"] + " (" + s2 + ") " + " 股價"
+				  },
+
+				  exporting: {
+				    enabled: false
+				  },
+			        scrollbar: {
+			            enabled: false
+			        },
+				  series: [{
+				    name: s2,
+				    data: processed_json2,
+				    color: '#FF0000'
+				  }]
+				});
+
+
+	            var processed_json3 = new Array();
+	            for (i = 0; i < data["spread"].length; i++) {
+	                processed_json3.push([Date.parse(data["spread"][i].mtimestamp), parseFloat(data["spread"][i].avg_price)]);
+	            }
+
+			            // draw chart
+				Highcharts.stockChart('container3', {
+
+				  time: {
+				    useUTC: false
+				  },
+
+				  rangeSelector: {
+				    buttons: [{
+				      count: 1,
+				      type: 'minute',
+				      text: '1M'
+				    }, {
+				      count: 5,
+				      type: 'minute',
+				      text: '5M'
+				    }, {
+				      type: 'all',
+				      text: 'All'
+				    }],
+				    inputEnabled: false,
+				    selected: 2
+				  },
+			        yAxis: {
+			            plotLines: [
+			            {
+			                value: parseFloat(mu),
+			                color: '#34C782',
+			                width: 2,
+			                label: {
+			                    text: 'mean'
+			                }
+			            },
+						{
+			                value: parseFloat(mu) + 1.5 * parseFloat(stdev),
+			                color: '#3A97F4',
+			                width: 2,
+			                dashStyle: 'shortdash'
+			            },
+						{
+			                value: parseFloat(mu) - 1.5 * parseFloat(stdev),
+			                color: '#3A97F4',
+			                width: 2,
+			                dashStyle: 'shortdash',
+			                label: {
+			                    text: 'open'
+			                }
+			            },	
+						{
+			                value: parseFloat(mu) + 2.5 * parseFloat(stdev),
+			                color: '#EB1E1E',
+			                width: 2,
+			                dashStyle: 'shortdash'
+			            },
+						{
+			                value: parseFloat(mu) - 2.5 * parseFloat(stdev),
+			                color: '#EB1E1E',
+			                width: 2,
+			                dashStyle: 'shortdash',
+			                label: {
+			                    text: 'stop'
+			                }
+			            },		            
+			            ]
+			        },
+				  title: {
+				    text: s1 + " + " + s2 + " spread"
+				  },
+			        navigator: {
+			            enabled: false
+			        },
+				  exporting: {
+				    enabled: false
+				  },
+			        scrollbar: {
+			            enabled: false
+			        },
+				  series: [{
+				    name: "spread",
+				    data: processed_json3,
+				    color: '#875F9A'
+				  }]
+				});
+
+		$( "#pairs_table" ).hide(500);
+		$( "#time_pick" ).hide();
+		$( "#pairs_chart" ).show( 500 );
+		$( "#go_trade" ).show();
+		$( "#pairs_found" ).removeClass( "active" );
+		$( "#trade_result" ).addClass( "active" );
+		pairs_info = "<tr>" + "<td class=' center aligned '> zcr" + "</td>" + "<td class=' center aligned '>" + String(parseFloat(zcr).toFixed(4)) + "</td>" + "</tr>" + "<tr>" + "<td class=' center aligned '> mu" + "</td>" + "<td class=' center aligned '>" + String(parseFloat(mu).toFixed(4)) + "</td>" + "</tr>" + "</tr>" + "<tr>" + "<td class=' center aligned '> stdev" +"</td>" + "<td class=' center aligned '>" + String(parseFloat(stdev).toFixed(4)) + "</td>" + "</tr>" + "<tr>" + "<td class=' center aligned '>" + String(s1) + " 權重" +"</td>" + "<td class=' center aligned '>" + String(parseFloat(w1).toFixed(4)) + "</td>" + "</tr>" + "<tr>" + "<td class=' center aligned '> " + String(s2) + " 權重" +"</td>" + "<td class=' center aligned '>" + String(parseFloat(w2).toFixed(4)) + "</td>" + "</tr>" ;
+		document.getElementById("pairs_info").innerHTML = pairs_info;
+		start_backtest(day, s1, s2);
+	    }
+	 });
+	}); 	
+}
+
+function start_backtest(day, s1, s2){
+	$.ajax({
+	    	type:"GET",
+	    	dataType: 'json',
+	        url: "/stock/trade_backtest",
+	        data : { 's1' : s1, 's2' : s2, "trade_date" : day },
+	        success: function(response) {
+	        	data = JSON.parse(response);
+	        	console.log(data);
+	        	trade_history_table = "";
+	        	trade_news_table = ""
+
+	            if (data["trade_history"].length == 0){
+	            	trade_history_table += "<tr>"+ "<td class=' center aligned ' rowspan='2'>" + "無任何交易" + "</td>" + "</tr>" ;
+	            }
+	            else{
+		            for (i = 0; i < data["trade_history"].length; i++) {
+		            	tmp = data["trade_history"][i].split("/");
+		            	if (String(tmp[1]).includes("，上開倉") || String(tmp[1]).includes("，下開倉")){
+		            		trade_history_table += "<tr class='positive'>"
+		            	}
+		            	else if(String(tmp[1]).includes("結構性斷裂") || String(tmp[1]).includes("強制平倉")){
+		            		trade_history_table += "<tr class='error'>"
+		            	}
+		            	else{
+		            		trade_history_table += "<tr>";
+		            	}
+		            	trade_history_table += "<td class=' center aligned '>" + tmp[0] + "</td>" + "<td class=' center aligned '>" + tmp[1] + "</td>" + "</tr>"
+		            }	            	
+	            }
+	            if (data["s1_news"].length == 0 && data["s2_news"].length){
+	            	trade_news_table = "<tr>"+ "<td class=' center aligned ' rowspan='2'>" + "無新聞" + "</td>" + "</tr>" ;	            	
+	            }
+	            else{
+
+		            for (i = 0; i < data["s1_news"].length; i++) {
+		            	tmp = data["s1_news"][i];
+		            	console.log(tmp)
+		            	trade_news_table += "<tr>" + "<td class=' center aligned '>" + s1 + "</td>" + "<td class=' center aligned '>" + tmp["time"] + "</td>" + "<td class=' center aligned '>"  + "<a href='" + tmp["href"] + "' target='_blank' rel='noopener noreferrer'>" + tmp["title"] + "</a>" + "</td>" + "<td class=' center aligned '>" + '<div class="ui red progress" id=s1_news_'+ String(i)+'><div class="bar"></div></div>' + "</td>"+"</tr>"; 
+		            }
+		            for (i = 0; i < data["s2_news"].length; i++) {
+		            	tmp = data["s2_news"][i];
+		            	
+		            	trade_news_table += "<tr>"  + "<td class=' center aligned '>" + s2 + "</td>" +  "<td class=' center aligned '>" + tmp["time"] + "</td>" + "<td class=' center aligned '>" + "<a href='" + tmp["href"] + "' target='_blank' rel='noopener noreferrer'>" + tmp["title"] + "</a>" + "</td>" + "<td class=' center aligned '>" + '<div class="ui red progress" id=s2_news_'+ String(i)+'><div class="bar"></div></div>' + "</td>"+ "</tr>";
+
+
+
+	            	}
+	            }
+	            document.getElementById("trade_news").innerHTML = trade_news_table;
+
+
+	            trade_result_table =  "<tr>"+ "<td class=' center aligned '>" + "開倉次數" + "</td>" + "<td class=' center aligned '>" + data["local_open_num"] + "</td>" + "</tr>" + "<tr>"+ "<td class=' center aligned '>" + "報酬率" + "</td>" + "<td class=' center aligned '>" + String(parseFloat(data["local_rt"]).toFixed(6)*100) + " %</td>" + "</tr>";
+	            document.getElementById("trade_history").innerHTML = trade_history_table
+	            document.getElementById("trade_result_table").innerHTML = trade_result_table;  
+	            re_trade(day, s1, s2);
+	        }
+	    
+	 });	
+}
+
+function re_trade(day, s1, s2){
+	$("#retrade").click(function() {
+		var open_time = $("#open").val();
+		var stop_loss_time = $("#stop").val();
+		var maxi = $("#max_keep").val();
+		var tax_cost = $("#tax_cost").val();
+		var capital = $("#invest").val();
+		document.getElementById("trade_history").innerHTML = '<tr><td class="center aligned" colspan="2"> 計算中 .... </td></tr>';
+		document.getElementById("trade_result_table").innerHTML = '<tr>	<td class="center aligned" colspan="2"> 計算中 .... </td></tr>';  
+	$.ajax({
+	    	type:"GET",
+	    	dataType: 'json',
+	        url: "/stock/trade_backtest_tune",
+	        data : { 's1' : s1, 's2' : s2, "trade_date" : day, "open_time" : open_time, "stop_loss_time" : stop_loss_time, "maxi" : maxi, "tax_cost" : tax_cost, "capital" : capital},
+	        success: function(response) {
+	        	data = JSON.parse(response);
+	        	// console.log(data);
+	        	trade_history_table = "";
+	        	// console.log(data["trade_history"].length);
+	            if (data["trade_history"].length == 0){
+	            	trade_history_table += "<tr>"+ "<td class=' center aligned ' rowspan='2'>" + "無任何交易" + "</td>" + "</tr>" ;
+	            }
+	            else{
+		            for (i = 0; i < data["trade_history"].length; i++) {
+		            	tmp = data["trade_history"][i].split("/");
+		            	if (String(tmp[1]).includes("，上開倉") || String(tmp[1]).includes("，下開倉")){
+		            		trade_history_table += "<tr class='positive'>"
+		            	}
+		            	else if(String(tmp[1]).includes("結構性斷裂") || String(tmp[1]).includes("強制平倉")){
+		            		trade_history_table += "<tr class='error'>"
+		            	}
+		            	else{
+		            		trade_history_table += "<tr>";
+		            	}
+		            	trade_history_table += "<td class=' center aligned '>" + tmp[0] + "</td>" + "<td class=' center aligned '>" + tmp[1] + "</td>" + "</tr>"
+		            }	            	
+	            }
+
+	            document.getElementById("trade_history").innerHTML = trade_history_table;
+	            trade_result_table =  "<tr>"+ "<td class=' center aligned '>" + "開倉次數" + "</td>" + "<td class=' center aligned '>" + data["local_open_num"] + "</td>" + "</tr>" + "<tr>"+ "<td class=' center aligned '>" + "報酬率" + "</td>" + "<td class=' center aligned '>" + String(parseFloat(data["local_rt"]).toFixed(6)*100) + " %</td>" + "</tr>";
+	            //console.log(trade_result_table);
+	            document.getElementById("trade_result_table").innerHTML = trade_result_table;  
+	            // re_trade(day, s1, s2);
+	        }
+	 });				
+		// console.log(open,stop,max_keep,invest);
+	});
+}
+
+
+
+ 
+
+
+</script>
+</body>	
